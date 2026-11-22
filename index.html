@@ -1001,27 +1001,42 @@ function runStaticAnalysis(yaml) {
     score += 15;
   }
 
-  // 3. Command Injection via context expressions in run:
-  const injectionPatterns = [
-    /github\.event\.pull_request\.title/i,
-    /github\.event\.pull_request\.body/i,
-    /github\.event\.issue\.title/i,
-    /github\.event\.issue\.body/i,
-    /github\.event\.comment\.body/i,
-    /github\.head_ref/i
-  ];
-  let hasInjection = false;
-  injectionPatterns.forEach(pat => {
-    if (pat.test(yaml)) {
-      hasInjection = true;
+  // 3. Command Injection via context expressions strictly inside run: blocks
+  const lines = yaml.split('\n');
+  let inRun = false;
+  let runIndent = 0;
+  const injectionPattern = /\$\{\{\s*github\.(event\.(pull_request|issue|comment)\.(title|body)|head_ref)/i;
+  const detectedInjections = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const stripped = line.trim();
+    const indent = line.search(/\S/);
+
+    if (stripped.startsWith('run:')) {
+      inRun = true;
+      runIndent = indent >= 0 ? indent : 0;
+      if (injectionPattern.test(line)) {
+        detectedInjections.push(stripped);
+      }
+      continue;
     }
-  });
-  if (hasInjection) {
+
+    if (inRun) {
+      if (stripped && indent <= runIndent && /^[a-zA-Z0-9_-]+:/.test(stripped)) {
+        inRun = false;
+      } else if (inRun && injectionPattern.test(line)) {
+        detectedInjections.push(stripped);
+      }
+    }
+  }
+
+  if (detectedInjections.length > 0) {
     findings.push({
       severity: 'CRITICAL',
       title: 'Risco de Injeção de Comandos em Scripts Shell (Run:)',
-      desc: 'Expressões de contexto geradas por usuários externos foram interpoladas diretamente dentro de scripts shell inline. Caracteres como aspas e ponto-e-vírgula permitem injeção de comandos remotos.',
-      evidence: 'Interpolação direta de contexto não sanitizado encontrada em bloco de execução.'
+      desc: 'Expressões de contexto geradas por usuários externos foram interpoladas diretamente dentro de scripts shell inline do bloco run:. Caracteres como aspas e ponto-e-vírgula permitem injeção de comandos remotos.',
+      evidence: 'Interpolação direta em run: ' + detectedInjections.slice(0, 2).join('; ')
     });
     score += 40;
   }
