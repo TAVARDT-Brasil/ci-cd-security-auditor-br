@@ -70,26 +70,36 @@ def analyze_workflow_content(content, filename="workflow.yml"):
         })
         score += SEVERITY_WEIGHTS["MEDIUM"]
 
-    # 3. Command Injection via context expressions in run:
-    injection_patterns = [
-        (r"github\.event\.pull_request\.title", "github.event.pull_request.title"),
-        (r"github\.event\.pull_request\.body", "github.event.pull_request.body"),
-        (r"github\.event\.issue\.title", "github.event.issue.title"),
-        (r"github\.event\.issue\.body", "github.event.issue.body"),
-        (r"github\.event\.comment\.body", "github.event.comment.body"),
-        (r"github\.head_ref", "github.head_ref")
-    ]
+    # 3. Command Injection via context expressions strictly inside run: blocks
+    lines = content.splitlines()
+    in_run = False
+    run_indent = 0
+    injection_pattern = re.compile(r"\$\{\{\s*github\.(event\.(pull_request|issue|comment)\.(title|body)|head_ref)", re.IGNORECASE)
     detected_injections = []
-    for pattern, name in injection_patterns:
-        if re.search(pattern, content, re.IGNORECASE):
-            detected_injections.append(name)
+
+    for line in lines:
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+
+        if stripped.startswith("run:"):
+            in_run = True
+            run_indent = indent
+            if injection_pattern.search(line):
+                detected_injections.append(stripped)
+            continue
+
+        if in_run:
+            if stripped and indent <= run_indent and re.match(r"^[a-zA-Z0-9_-]+:", stripped):
+                in_run = False
+            elif in_run and injection_pattern.search(line):
+                detected_injections.append(stripped)
 
     if detected_injections:
         findings.append({
             "severity": "CRITICAL",
-            "title": "Injecao de Comandos Shell por Expressoes de Contexto",
+            "title": "Injecao de Comandos Shell por Expressoes de Contexto em run:",
             "description": "Expressões de entrada não sanitizadas interpoladas diretamente em blocos run: permitem quebra de comandos shell e RCE.",
-            "evidence": "Variáveis de contexto detectadas: " + ", ".join(detected_injections),
+            "evidence": "Instruções detectadas: " + "; ".join(detected_injections[:2]),
             "remediation": "Passe variáveis de contexto através de variáveis de ambiente no bloco env: em vez de interpolação direta."
         })
         score += SEVERITY_WEIGHTS["CRITICAL"]
