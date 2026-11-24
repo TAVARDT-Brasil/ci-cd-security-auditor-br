@@ -43,12 +43,11 @@ python audit_ci_cd_security.py .github/workflows/
 
 ***
 
-## Governança e Soberania
+## Links Úteis
 
-* **Unidade Soberana**: [TAVARDT Brasil](https://ag.tavardt.com/br/) (`TAVARDT-Brasil`)
-* **Normas Centrais**: [00-core Governança](https://github.com/TAVARDT-Brasil/00-core)
-* **Central de Diagnósticos**: [Central de Ferramentas TAVARDT](https://tools.tavardt.com/br/)
-* **Segurança Corporativa**: [TAVARDT Cibersegurança](https://ag.tavardt.com/br/ciberseguranca/)
+* **Portal Corporativo:** https://ag.tavardt.com/br/
+* **Suíte de Diagnósticos:** https://tools.tavardt.com/br/
+* **Contato Técnico:** https://ag.tavardt.com/br/contato/
 
 ***
 
